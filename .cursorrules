@@ -1,0 +1,26 @@
+# Taleify Development Rules
+
+## Tech Stack
+- Bun for package management
+- TypeScript everywhere
+- React Native (Expo) for mobile
+- Next.js for web
+- Supabase for backend
+- react-native-track-player for audio
+
+## Code Style
+- Use functional components with hooks
+- Prefer const over let
+- Use async/await over promises
+- Always handle errors properly
+- Add loading states for async operations
+
+## Monorepo
+- Use workspace:* for internal packages
+- Keep shared code in packages/
+- Don't duplicate logic between apps
+
+## Supabase
+- Always use typed client from @taleify/supabase
+- Enable RLS on all tables
+- Use upsert for progress tracking

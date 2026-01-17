@@ -1,0 +1,21 @@
+{
+  "name": "taleify",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "cd apps/web && bun run dev",
+    "dev:mobile": "cd apps/mobile && bun run start",
+    "build:web": "cd apps/web && bun run build",
+    "ios": "cd apps/mobile && bun run ios",
+    "android": "cd apps/mobile && bun run android"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

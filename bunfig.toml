@@ -1,0 +1,3 @@
+[install]
+# Don't hoist packages - keep them in each workspace
+hoist = false

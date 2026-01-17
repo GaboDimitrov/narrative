@@ -1,0 +1,694 @@
+{
+  "name": "Novel to Audiobook Generator",
+  "nodes": [
+    {
+      "id": "form-trigger",
+      "name": "Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.1,
+      "position": [240, 300],
+      "parameters": {
+        "formTitle": "Novel to Audiobook Generator",
+        "formDescription": "Upload a PDF novel to generate an AI-voiced audiobook",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "PDF File",
+              "fieldType": "file",
+              "requiredField": true,
+              "acceptFileTypes": ".pdf"
+            },
+            {
+              "fieldLabel": "Title",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Author",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Cover Image URL",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "https://example.com/cover.jpg"
+            },
+            {
+              "fieldLabel": "Supabase URL",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "https://yourproject.supabase.co"
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "webhookId": "novel-audiobook-upload"
+    },
+    {
+      "id": "set-inputs",
+      "name": "Set Novel Inputs",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {"name": "title", "value": "={{ $json['Title'] }}", "type": "string"},
+            {"name": "author", "value": "={{ $json['Author'] }}", "type": "string"},
+            {"name": "coverUrl", "value": "={{ $json['Cover Image URL'] || '' }}", "type": "string"},
+            {"name": "supabaseUrl", "value": "={{ $json['Supabase URL'] }}", "type": "string"},
+            {"name": "storyId", "value": "={{ $randomUUID() }}", "type": "string"}
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "notes": "Extract form data and generate story ID. FIXED: includeOtherFields=true to preserve PDF binary"
+    },
+    {
+      "id": "extract-text",
+      "name": "Extract Text from PDF", 
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "parameters": {
+        "binaryPropertyName": "PDF_File",
+        "options": {}
+      },
+      "notes": "Extracts text from the uploaded PDF file. FIXED: Use PDF_File (underscore) not 'PDF File'"
+    },
+    {
+      "id": "chunk-text",
+      "name": "Chunk Text for Processing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "parameters": {
+        "jsCode": "// Chunk the novel text into manageable pieces for GPT\n// Each chunk should be ~6000 tokens (~24000 chars) to leave room for response\nconst MAX_CHUNK_SIZE = 24000;\nconst text = $input.first().json.data;\nconst metadata = $('Set Novel Inputs').first().json;\n\nif (!text || text.length === 0) {\n  throw new Error('No text extracted from PDF');\n}\n\n// Split into chunks at paragraph boundaries\nconst paragraphs = text.split(/\\n\\n+/);\nconst chunks = [];\nlet currentChunk = '';\n\nfor (const para of paragraphs) {\n  if ((currentChunk + para).length > MAX_CHUNK_SIZE && currentChunk.length > 0) {\n    chunks.push(currentChunk.trim());\n    currentChunk = para;\n  } else {\n    currentChunk += (currentChunk ? '\\n\\n' : '') + para;\n  }\n}\nif (currentChunk.trim()) {\n  chunks.push(currentChunk.trim());\n}\n\nreturn [{\n  json: {\n    ...metadata,\n    fullText: text,\n    chunks: chunks,\n    totalChunks: chunks.length\n  }\n}];"
+      },
+      "notes": "Split novel into chunks to avoid GPT token limits"
+    },
+    {
+      "id": "gpt-split-chapters",
+      "name": "GPT Detect Chapters",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.4,
+      "position": [1120, 300],
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "model": "gpt-4o",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a text analysis assistant. Analyze novel text and identify chapter boundaries. Return valid JSON only, no markdown."
+            },
+            {
+              "role": "user",
+              "content": "=Analyze this novel text and identify chapters. For each chunk of text provided, detect any chapter boundaries.\n\nReturn a JSON object with this exact structure:\n{\n  \"chapters\": [\n    {\"number\": 1, \"title\": \"Chapter Title or Chapter 1\", \"startText\": \"first 50 chars...\", \"text\": \"full chapter text...\"}\n  ]\n}\n\nIf no chapter markers found, treat the entire text as Chapter 1.\n\nText to analyze:\n{{ $json.chunks[0] || $json.fullText.substring(0, 24000) }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 4096,
+          "responseFormat": "json_object"
+        }
+      },
+      "credentials": {},
+      "notes": "Configure OpenAI credentials in n8n UI. Uses GPT-4o for better accuracy."
+    },
+    {
+      "id": "parse-chapters",
+      "name": "Parse Chapter JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300],
+      "parameters": {
+        "jsCode": "// Parse the GPT response and extract chapters\nconst gptResponse = $input.first().json.message?.content || $input.first().json.text;\nconst metadata = $('Set Novel Inputs').first().json;\n\nlet chapters;\ntry {\n  const parsed = typeof gptResponse === 'string' ? JSON.parse(gptResponse) : gptResponse;\n  chapters = parsed.chapters || parsed;\n  \n  if (!Array.isArray(chapters)) {\n    chapters = [chapters];\n  }\n} catch (e) {\n  // If parsing fails, create a single chapter from the full text\n  const fullText = $('Chunk Text for Processing').first().json.fullText;\n  chapters = [{\n    number: 1,\n    title: 'Chapter 1',\n    text: fullText\n  }];\n}\n\n// Return each chapter as a separate item for processing\nreturn chapters.map((chapter, idx) => ({\n  json: {\n    ...metadata,\n    chapterNumber: chapter.number || idx + 1,\n    chapterTitle: chapter.title || `Chapter ${idx + 1}`,\n    chapterText: chapter.text || '',\n    totalChapters: chapters.length\n  }\n}));"
+      },
+      "notes": "Parse GPT JSON response and split into individual chapter items"
+    },
+    {
+      "id": "loop-chapters",
+      "name": "Loop Each Chapter",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1560, 300],
+      "parameters": {
+        "batchSize": 1,
+        "options": {
+          "reset": false
+        }
+      },
+      "notes": "Process chapters one at a time to manage memory and rate limits"
+    },
+    {
+      "id": "gpt-character-analysis",
+      "name": "GPT Analyze Characters",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.4,
+      "position": [1780, 300],
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "model": "gpt-4o",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a dialogue analysis assistant. Identify speakers in narrative text and split into segments. Return valid JSON only."
+            },
+            {
+              "role": "user",
+              "content": "=Analyze this chapter and split it into segments by speaker. Identify the narrator and all character dialogue.\n\nFor each character, determine their likely gender based on context (names, pronouns, descriptions).\n\nReturn JSON:\n{\n  \"characters\": [\n    {\"name\": \"Narrator\", \"gender\": \"neutral\"},\n    {\"name\": \"Character Name\", \"gender\": \"male|female|neutral\"}\n  ],\n  \"segments\": [\n    {\"speaker\": \"Narrator\", \"text\": \"narrative text...\"},\n    {\"speaker\": \"Character Name\", \"text\": \"dialogue...\"}\n  ]\n}\n\nChapter {{ $json.chapterNumber }}: {{ $json.chapterTitle }}\n\n{{ $json.chapterText.substring(0, 12000) }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 4096,
+          "responseFormat": "json_object"
+        }
+      },
+      "credentials": {},
+      "notes": "Configure OpenAI credentials in n8n UI"
+    },
+    {
+      "id": "parse-characters",
+      "name": "Parse Character Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300],
+      "parameters": {
+        "jsCode": "// Parse character analysis and assign voice IDs\nconst gptResponse = $input.first().json.message?.content || $input.first().json.text;\nconst chapterData = $('Loop Each Chapter').first().json;\n\n// ElevenLabs voice IDs - expand this map as needed\nconst voiceMap = {\n  narrator: '21m00Tcm4TlvDq8ikWAM',\n  male1: 'VR6AewLTigWG4xSOukaG',\n  male2: 'ErXwobaYiN019PkySvjV',\n  male3: 'pNInz6obpgDQGcFmaJgB',\n  female1: 'jsCqWAovK2LkecY7zXl4',\n  female2: 'EXAVITQu4vr4xnSDxMaL',\n  female3: 'XB0fDUnXU5powFXDhCwa',\n  neutral: '21m00Tcm4TlvDq8ikWAM'\n};\n\nlet parsed;\ntry {\n  parsed = typeof gptResponse === 'string' ? JSON.parse(gptResponse) : gptResponse;\n} catch (e) {\n  return [{\n    json: {\n      ...chapterData,\n      segments: [{\n        speaker: 'Narrator',\n        text: chapterData.chapterText,\n        voiceId: voiceMap.narrator,\n        gender: 'neutral'\n      }]\n    }\n  }];\n}\n\nconst characters = parsed.characters || [];\nconst segments = parsed.segments || [];\n\nconst characterVoices = {};\nlet maleCount = 0;\nlet femaleCount = 0;\n\nfor (const char of characters) {\n  const name = char.name.toLowerCase();\n  if (name === 'narrator') {\n    characterVoices[char.name] = voiceMap.narrator;\n  } else if (char.gender === 'male') {\n    maleCount++;\n    const voiceKey = `male${Math.min(maleCount, 3)}`;\n    characterVoices[char.name] = voiceMap[voiceKey];\n  } else if (char.gender === 'female') {\n    femaleCount++;\n    const voiceKey = `female${Math.min(femaleCount, 3)}`;\n    characterVoices[char.name] = voiceMap[voiceKey];\n  } else {\n    characterVoices[char.name] = voiceMap.neutral;\n  }\n}\n\nconst voicedSegments = segments.map((seg, idx) => ({\n  segmentIndex: idx,\n  speaker: seg.speaker,\n  text: seg.text,\n  voiceId: characterVoices[seg.speaker] || voiceMap.narrator,\n  gender: characters.find(c => c.name === seg.speaker)?.gender || 'neutral'\n}));\n\nreturn [{\n  json: {\n    ...chapterData,\n    characters: characters,\n    segments: voicedSegments,\n    totalSegments: voicedSegments.length\n  }\n}];"
+      },
+      "notes": "Dynamically assign different voices based on character gender"
+    },
+    {
+      "id": "split-segments",
+      "name": "Split Segments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2220, 300],
+      "parameters": {
+        "jsCode": "// Split segments into individual items for TTS processing\nconst data = $input.first().json;\nconst segments = data.segments || [];\n\nif (segments.length === 0) {\n  throw new Error('No segments to process');\n}\n\nreturn segments.map(segment => ({\n  json: {\n    storyId: data.storyId,\n    title: data.title,\n    author: data.author,\n    supabaseUrl: data.supabaseUrl,\n    chapterNumber: data.chapterNumber,\n    chapterTitle: data.chapterTitle,\n    totalSegments: data.totalSegments,\n    ...segment\n  }\n}));"
+      },
+      "notes": "Split segments array into individual items for TTS"
+    },
+    {
+      "id": "elevenlabs-tts",
+      "name": "ElevenLabs Generate Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2440, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $json.voiceId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "elevenlabsApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type", "value": "application/json"},
+            {"name": "Accept", "value": "audio/mpeg"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($json.text) }},\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"voice_settings\": {\n    \"stability\": 0.5,\n    \"similarity_boost\": 0.75\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "audioData"
+            }
+          }
+        }
+      },
+      "notes": "Generate audio for each segment. Configure ElevenLabs API credentials in n8n UI."
+    },
+    {
+      "id": "wait-rate-limit",
+      "name": "Wait for Rate Limit",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2660, 300],
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
+      "notes": "Prevent hitting ElevenLabs rate limits"
+    },
+    {
+      "id": "aggregate-audio",
+      "name": "Aggregate Chapter Audio",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [2880, 300],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "audioSegments",
+        "include": "allFieldsIncludingBinary",
+        "options": {}
+      },
+      "notes": "Collect all audio segments for the chapter. FIXED: Include binary data"
+    },
+    {
+      "id": "prepare-cloudconvert",
+      "name": "Prepare CloudConvert Merge",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3100, 300],
+      "parameters": {
+        "jsCode": "// Prepare data for CloudConvert merge\nconst items = $input.all();\nconst allBinaryData = [];\nlet metadata = null;\n\n// Collect all binary audio data\nfor (const item of items) {\n  if (!metadata && item.json.audioSegments) {\n    // Get metadata from aggregated item\n    const firstSegment = item.json.audioSegments[0];\n    metadata = {\n      storyId: firstSegment.storyId,\n      title: firstSegment.title,\n      author: firstSegment.author,\n      supabaseUrl: firstSegment.supabaseUrl,\n      chapterNumber: firstSegment.chapterNumber,\n      chapterTitle: firstSegment.chapterTitle\n    };\n  }\n  \n  // Collect binary data from item\n  if (item.binary) {\n    for (const key of Object.keys(item.binary)) {\n      if (item.binary[key]) {\n        allBinaryData.push({\n          key: key,\n          data: item.binary[key]\n        });\n      }\n    }\n  }\n}\n\nif (!metadata) {\n  throw new Error('No metadata found in aggregated items');\n}\n\nconst outputFilename = `chapter_${String(metadata.chapterNumber).padStart(2, '0')}.mp3`;\n\nreturn [{\n  json: {\n    ...metadata,\n    outputFilename: outputFilename,\n    segmentCount: allBinaryData.length\n  },\n  binary: allBinaryData.reduce((acc, bd, idx) => {\n    acc[`segment_${String(idx).padStart(4, '0')}`] = bd.data;\n    return acc;\n  }, {})\n}];"
+      },
+      "notes": "Prepare audio segments for CloudConvert merge API"
+    },
+    {
+      "id": "cloudconvert-create-job",
+      "name": "CloudConvert Create Merge Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3320, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cloudconvert.com/v2/jobs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudConvertApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"tasks\": {\n    \"import-my-file\": {\n      \"operation\": \"import/upload\"\n    },\n    \"merge-audio\": {\n      \"operation\": \"merge\",\n      \"output_format\": \"mp3\",\n      \"input\": [\"import-my-file\"]\n    },\n    \"export-result\": {\n      \"operation\": \"export/url\",\n      \"input\": [\"merge-audio\"]\n    }\n  }\n}",
+        "options": {}
+      },
+      "notes": "Create CloudConvert job for merging audio. Configure CloudConvert API credentials in n8n UI."
+    },
+    {
+      "id": "cloudconvert-upload",
+      "name": "CloudConvert Upload Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3540, 300],
+      "parameters": {
+        "jsCode": "// Upload audio files to CloudConvert\nconst jobResponse = $input.first().json;\nconst prepData = $('Prepare CloudConvert Merge').first();\nconst binaryData = prepData.binary;\nconst metadata = prepData.json;\n\n// Find the import task\nconst importTask = jobResponse.data.tasks.find(t => t.operation === 'import/upload');\n\nif (!importTask || !importTask.result || !importTask.result.form) {\n  throw new Error('CloudConvert import task not ready');\n}\n\nconst uploadUrl = importTask.result.form.url;\nconst uploadParams = importTask.result.form.parameters;\n\nconst segmentKeys = Object.keys(binaryData).sort();\n\nreturn [{\n  json: {\n    ...metadata,\n    jobId: jobResponse.data.id,\n    uploadUrl: uploadUrl,\n    uploadParams: uploadParams,\n    segmentKeys: segmentKeys\n  },\n  binary: binaryData\n}];"
+      },
+      "notes": "Extract CloudConvert upload URL and prepare for upload"
+    },
+    {
+      "id": "cloudconvert-upload-file",
+      "name": "Upload to CloudConvert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3760, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.uploadUrl }}",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": []
+        },
+        "options": {}
+      },
+      "notes": "Upload merged segments to CloudConvert"
+    },
+    {
+      "id": "wait-cloudconvert",
+      "name": "Wait for CloudConvert",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3980, 300],
+      "parameters": {
+        "amount": 10,
+        "unit": "seconds"
+      },
+      "notes": "Wait for CloudConvert to process the merge"
+    },
+    {
+      "id": "cloudconvert-get-job",
+      "name": "CloudConvert Get Job Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4200, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.cloudconvert.com/v2/jobs/{{ $('CloudConvert Upload Files').first().json.jobId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "cloudConvertApi",
+        "options": {}
+      },
+      "notes": "Check CloudConvert job status and get result URL"
+    },
+    {
+      "id": "download-merged",
+      "name": "Download Merged Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4420, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.data.tasks.find(t => t.operation === 'export/url')?.result?.files[0]?.url || '' }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "mergedAudio"
+            }
+          }
+        }
+      },
+      "notes": "Download the merged MP3 from CloudConvert"
+    },
+    {
+      "id": "upload-supabase",
+      "name": "Upload to Supabase Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4640, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Prepare CloudConvert Merge').first().json.supabaseUrl }}/storage/v1/object/audiobooks/{{ $('Prepare CloudConvert Merge').first().json.storyId }}/{{ $('Prepare CloudConvert Merge').first().json.outputFilename }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type", "value": "audio/mpeg"}
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "mergedAudio",
+        "options": {}
+      },
+      "notes": "Upload MP3 file to Supabase Storage. Configure Supabase API credentials in n8n UI."
+    },
+    {
+      "id": "store-chapter-info",
+      "name": "Store Chapter Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4860, 300],
+      "parameters": {
+        "jsCode": "// Store chapter info for later database insertion\nconst prepData = $('Prepare CloudConvert Merge').first().json;\n\nreturn [{\n  json: {\n    storyId: prepData.storyId,\n    title: prepData.title,\n    author: prepData.author,\n    supabaseUrl: prepData.supabaseUrl,\n    chapterNumber: prepData.chapterNumber,\n    chapterTitle: prepData.chapterTitle,\n    outputFilename: prepData.outputFilename,\n    audioUrl: `${prepData.supabaseUrl}/storage/v1/object/public/audiobooks/${prepData.storyId}/${prepData.outputFilename}`\n  }\n}];"
+      },
+      "notes": "Prepare chapter data for database insertion"
+    },
+    {
+      "id": "check-more-chapters",
+      "name": "Check More Chapters",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [5080, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-batch-done",
+              "leftValue": "={{ $('Loop Each Chapter').first().context.noItemsLeft }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "Check if there are more chapters to process"
+    },
+    {
+      "id": "create-story-record",
+      "name": "Create Story in Database",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5300, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Set Novel Inputs').first().json.supabaseUrl }}/rest/v1/stories",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type", "value": "application/json"},
+            {"name": "Prefer", "value": "return=representation"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"id\": \"{{ $('Set Novel Inputs').first().json.storyId }}\",\n  \"title\": {{ JSON.stringify($('Set Novel Inputs').first().json.title) }},\n  \"author\": {{ JSON.stringify($('Set Novel Inputs').first().json.author) }},\n  \"cover_url\": {{ JSON.stringify($('Set Novel Inputs').first().json.coverUrl || '') }},\n  \"description\": \"AI-generated audiobook with character voices\"\n}",
+        "options": {}
+      },
+      "notes": "Create the story record in Supabase database"
+    },
+    {
+      "id": "create-chapter-records",
+      "name": "Create Chapter Records",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5520, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Set Novel Inputs').first().json.supabaseUrl }}/rest/v1/chapters",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Content-Type", "value": "application/json"},
+            {"name": "Prefer", "value": "return=representation"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"story_id\": \"{{ $('Store Chapter Info').first().json.storyId }}\",\n  \"title\": {{ JSON.stringify($('Store Chapter Info').first().json.chapterTitle) }},\n  \"order_index\": {{ $('Store Chapter Info').first().json.chapterNumber }},\n  \"audio_url\": {{ JSON.stringify($('Store Chapter Info').first().json.audioUrl) }},\n  \"duration_ms\": null\n}",
+        "options": {}
+      },
+      "notes": "Create chapter records with audio URLs in Supabase database"
+    },
+    {
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [5740, 180],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Audiobook generated successfully!\",\n  \"storyId\": \"{{ $('Set Novel Inputs').first().json.storyId }}\",\n  \"title\": {{ JSON.stringify($('Set Novel Inputs').first().json.title) }},\n  \"author\": {{ JSON.stringify($('Set Novel Inputs').first().json.author) }}\n}",
+        "options": {}
+      },
+      "notes": "Return success response to the form"
+    }
+  ],
+  "connections": {
+    "Form Trigger": {
+      "main": [
+        [
+          {"node": "Set Novel Inputs", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Set Novel Inputs": {
+      "main": [
+        [
+          {"node": "Extract Text from PDF", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Extract Text from PDF": {
+      "main": [
+        [
+          {"node": "Chunk Text for Processing", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Chunk Text for Processing": {
+      "main": [
+        [
+          {"node": "GPT Detect Chapters", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "GPT Detect Chapters": {
+      "main": [
+        [
+          {"node": "Parse Chapter JSON", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Parse Chapter JSON": {
+      "main": [
+        [
+          {"node": "Loop Each Chapter", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Loop Each Chapter": {
+      "main": [
+        [
+          {"node": "GPT Analyze Characters", "type": "main", "index": 0}
+        ],
+        [
+          {"node": "Create Story in Database", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "GPT Analyze Characters": {
+      "main": [
+        [
+          {"node": "Parse Character Analysis", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Parse Character Analysis": {
+      "main": [
+        [
+          {"node": "Split Segments", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Split Segments": {
+      "main": [
+        [
+          {"node": "ElevenLabs Generate Audio", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "ElevenLabs Generate Audio": {
+      "main": [
+        [
+          {"node": "Wait for Rate Limit", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Wait for Rate Limit": {
+      "main": [
+        [
+          {"node": "Aggregate Chapter Audio", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Aggregate Chapter Audio": {
+      "main": [
+        [
+          {"node": "Prepare CloudConvert Merge", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Prepare CloudConvert Merge": {
+      "main": [
+        [
+          {"node": "CloudConvert Create Merge Job", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "CloudConvert Create Merge Job": {
+      "main": [
+        [
+          {"node": "CloudConvert Upload Files", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "CloudConvert Upload Files": {
+      "main": [
+        [
+          {"node": "Upload to CloudConvert", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Upload to CloudConvert": {
+      "main": [
+        [
+          {"node": "Wait for CloudConvert", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Wait for CloudConvert": {
+      "main": [
+        [
+          {"node": "CloudConvert Get Job Status", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "CloudConvert Get Job Status": {
+      "main": [
+        [
+          {"node": "Download Merged Audio", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Download Merged Audio": {
+      "main": [
+        [
+          {"node": "Upload to Supabase Storage", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Upload to Supabase Storage": {
+      "main": [
+        [
+          {"node": "Store Chapter Info", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Store Chapter Info": {
+      "main": [
+        [
+          {"node": "Check More Chapters", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Check More Chapters": {
+      "main": [
+        [
+          {"node": "Loop Each Chapter", "type": "main", "index": 0}
+        ],
+        [
+          {"node": "Create Story in Database", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Create Story in Database": {
+      "main": [
+        [
+          {"node": "Create Chapter Records", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Create Chapter Records": {
+      "main": [
+        [
+          {"node": "Success Response", "type": "main", "index": 0}
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "pinData": {}
+}

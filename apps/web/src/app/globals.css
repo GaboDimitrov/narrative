@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0f0f1a;
+  --background-card: #1a1a2e;
+  --background-elevated: #252540;
+  --border: #3a3a55;
+  --text-primary: #ffffff;
+  --text-secondary: #b8b8d0;
+  --text-muted: #6b6b8a;
+  --accent: #8b5cf6;
+  --accent-light: #a78bfa;
+  --accent-pink: #ec4899;
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  color: var(--text-primary);
+  background: var(--background);
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-card);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Selection */
+::selection {
+  background: rgba(139, 92, 246, 0.3);
+  color: white;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .glow {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  
+  .glow-lg {
+    box-shadow: 0 0 40px rgba(139, 92, 246, 0.4);
+  }
+  
+  .glow-pink {
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.3);
+  }
+}
+
+@layer components {
+  .card {
+    background: var(--background-card);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+    color: white;
+    font-weight: 600;
+    padding: 1rem 2rem;
+    border-radius: 9999px;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-primary:hover {
+    box-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
+    transform: translateY(-1px);
+  }
+  
+  .btn-secondary {
+    background: var(--background-card);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-weight: 500;
+    padding: 1rem 2rem;
+    border-radius: 9999px;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+  }
+}
