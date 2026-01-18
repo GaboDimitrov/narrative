@@ -1,7 +1,7 @@
 -- Seed data for Taleify MVP
 -- Using LibriVox public domain audiobooks
 
--- Insert sample stories
+-- Insert sample stories (regular audiobooks)
 INSERT INTO stories (id, title, author, description, cover_url) VALUES
 (
   '550e8400-e29b-41d4-a716-446655440001',
@@ -23,6 +23,36 @@ INSERT INTO stories (id, title, author, description, cover_url) VALUES
   'Jane Austen',
   'Follow Elizabeth Bennet as she navigates love, family, and society in Regency England. A timeless romance filled with wit, charm, and unforgettable characters.',
   'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop'
+);
+
+-- Insert sample stories with custom voices (My Voice section)
+INSERT INTO stories (id, title, author, description, cover_url, voice_id, voice_name) VALUES
+(
+  '550e8400-e29b-41d4-a716-446655440004',
+  'The Great Gatsby',
+  'F. Scott Fitzgerald',
+  'A tale of wealth, love, and the American Dream in the Roaring Twenties. Narrated in your own voice.',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop',
+  'custom_voice_001',
+  'My Voice Clone'
+),
+(
+  '550e8400-e29b-41d4-a716-446655440005',
+  'Frankenstein',
+  'Mary Shelley',
+  'The classic tale of science, ambition, and the monster within. Experience it with your personalized narration.',
+  'https://images.unsplash.com/photo-1509248961895-40c8d8b7be5e?w=400&h=600&fit=crop',
+  'custom_voice_002',
+  'My Voice Clone'
+),
+(
+  '550e8400-e29b-41d4-a716-446655440006',
+  'Dracula',
+  'Bram Stoker',
+  'The immortal vampire tale that defined a genre. Hear it narrated in your unique voice.',
+  'https://images.unsplash.com/photo-1604076913837-52ab5629fba9?w=400&h=600&fit=crop',
+  'custom_voice_003',
+  'My Voice Clone'
 );
 
 -- Insert chapters for The Time Machine
@@ -89,4 +119,49 @@ INSERT INTO chapters (story_id, title, order_index, audio_url, duration_ms) VALU
   3,
   'https://www.archive.org/download/pride_prejudice_librivox/prideandprejudice_03_austen.mp3',
   480000
+);
+
+-- Insert chapters for voice-cloned stories
+INSERT INTO chapters (story_id, title, order_index, audio_url, duration_ms) VALUES
+(
+  '550e8400-e29b-41d4-a716-446655440004',
+  'Chapter 1: In My Younger Years',
+  1,
+  'https://www.archive.org/download/great_gatsby_librivox/greatgatsby_01_fitzgerald.mp3',
+  900000
+),
+(
+  '550e8400-e29b-41d4-a716-446655440004',
+  'Chapter 2: The Valley of Ashes',
+  2,
+  'https://www.archive.org/download/great_gatsby_librivox/greatgatsby_02_fitzgerald.mp3',
+  1080000
+),
+(
+  '550e8400-e29b-41d4-a716-446655440005',
+  'Letter 1: To Mrs. Saville',
+  1,
+  'https://www.archive.org/download/frankenstein_1818_librivox/frankenstein_01_shelley.mp3',
+  720000
+),
+(
+  '550e8400-e29b-41d4-a716-446655440005',
+  'Letter 2: To Mrs. Saville',
+  2,
+  'https://www.archive.org/download/frankenstein_1818_librivox/frankenstein_02_shelley.mp3',
+  600000
+),
+(
+  '550e8400-e29b-41d4-a716-446655440006',
+  'Jonathan Harker''s Journal',
+  1,
+  'https://www.archive.org/download/dracula_librivox/dracula_01_stoker.mp3',
+  1200000
+),
+(
+  '550e8400-e29b-41d4-a716-446655440006',
+  'Jonathan Harker''s Journal (Continued)',
+  2,
+  'https://www.archive.org/download/dracula_librivox/dracula_02_stoker.mp3',
+  1320000
 );

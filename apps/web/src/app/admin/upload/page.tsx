@@ -29,6 +29,7 @@ export default function AdminUploadPage() {
   const [narratorVoice, setNarratorVoice] = useState('');
   const [voiceStability, setVoiceStability] = useState(60); // 0-100, default 60%
   const [voiceStyle, setVoiceStyle] = useState(15); // 0-100, default 15%
+  const [voiceSpeed, setVoiceSpeed] = useState(100); // 25-400, default 100 (1.0x)
   const [voiceClarity, setVoiceClarity] = useState(true); // speaker boost
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +115,7 @@ export default function AdminUploadPage() {
       }
       formData.append('voiceStability', String(voiceStability / 100));
       formData.append('voiceStyle', String(voiceStyle / 100));
+      formData.append('voiceSpeed', String(voiceSpeed / 100));
       formData.append('voiceClarity', String(voiceClarity));
 
       setProgress('Processing PDF and generating audiobook... This may take several minutes.');
@@ -154,6 +156,7 @@ export default function AdminUploadPage() {
       setNarratorVoice('');
       setVoiceStability(60);
       setVoiceStyle(15);
+      setVoiceSpeed(100);
       setVoiceClarity(true);
       
       // Reset file input
@@ -410,6 +413,32 @@ export default function AdminUploadPage() {
                 <div className="flex justify-between text-xs text-gray-400 mt-1">
                   <span>Neutral</span>
                   <span>Dramatic</span>
+                </div>
+              </div>
+
+              {/* Speed Slider */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label htmlFor="voiceSpeed" className="text-sm text-gray-600">
+                    Reading Speed
+                  </label>
+                  <span className="text-sm text-gray-500">{(voiceSpeed / 100).toFixed(2)}x</span>
+                </div>
+                <input
+                  id="voiceSpeed"
+                  type="range"
+                  min="25"
+                  max="200"
+                  step="5"
+                  value={voiceSpeed}
+                  onChange={(e) => setVoiceSpeed(Number(e.target.value))}
+                  disabled={isLoading}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600 disabled:opacity-50"
+                />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>0.25x Slow</span>
+                  <span>1x Normal</span>
+                  <span>2x Fast</span>
                 </div>
               </div>
 

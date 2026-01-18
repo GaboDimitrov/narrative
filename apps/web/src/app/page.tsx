@@ -1,6 +1,6 @@
 import Header from '@/components/Header';
 import Hero from '@/components/Hero';
-import ScrollShowcase from '@/components/ScrollShowcase';
+import HowItWorks from '@/components/HowItWorks';
 import Features from '@/components/Features';
 import Roadmap from '@/components/Roadmap';
 import WaitlistForm from '@/components/WaitlistForm';
@@ -11,7 +11,7 @@ export default function HomePage() {
     <main className="min-h-screen bg-dark-bg">
       <Header />
       <Hero />
-      <ScrollShowcase />
+      <HowItWorks />
       <Features />
       <Roadmap />
       

@@ -7,7 +7,6 @@ import {
   Image,
   StyleSheet,
   ActivityIndicator,
-  TextInput,
   ScrollView,
   Dimensions,
 } from 'react-native';
@@ -23,18 +22,21 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - spacing.lg * 3) / 2;
+const CAROUSEL_CARD_WIDTH = width * 0.4;
 
 const CATEGORIES = ['All', 'Fiction', 'Mystery', 'Fantasy', 'Sci-Fi'];
 
 export function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [stories, setStories] = useState<Story[]>([]);
+  const [voiceStories, setVoiceStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [voiceLoading, setVoiceLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
 
   useEffect(() => {
     fetchStories();
+    fetchVoiceStories();
   }, []);
 
   async function fetchStories() {
@@ -53,16 +55,31 @@ export function HomeScreen() {
     }
   }
 
-  const filteredStories = stories.filter(story => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        story.title.toLowerCase().includes(query) ||
-        story.author?.toLowerCase().includes(query)
-      );
+  async function fetchVoiceStories() {
+    try {
+      const { data, error } = await supabase
+        .from('stories')
+        .select('*')
+        .not('voice_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        // Silently fail if voice_id column doesn't exist yet
+        if (error.message?.includes('voice_id') || error.code === '42703') {
+          console.log('Voice columns not yet available');
+        } else {
+          console.error('Error fetching voice stories:', error);
+        }
+      } else {
+        setVoiceStories(data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch voice stories:', error);
+    } finally {
+      setVoiceLoading(false);
     }
-    return true;
-  });
+  }
 
   const renderStory = ({ item, index }: { item: Story; index: number }) => (
     <TouchableOpacity
@@ -97,27 +114,8 @@ export function HomeScreen() {
     </TouchableOpacity>
   );
 
-  return (
-    <View style={styles.container}>
-      {/* Search Section */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search audiobooks..."
-            placeholderTextColor={colors.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Text style={styles.clearIcon}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
+  const renderHeader = () => (
+    <>
       {/* Categories */}
       <View style={styles.categoriesWrapper}>
         <ScrollView
@@ -147,14 +145,70 @@ export function HomeScreen() {
         </ScrollView>
       </View>
 
-      {/* Section Header */}
+      {/* My Voice Section - Only show if there are voice stories */}
+      {!voiceLoading && voiceStories.length > 0 && (
+        <>
+          {/* My Voice Header */}
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.voiceIcon}>🎤</Text>
+              <Text style={styles.sectionTitle}>My Voice</Text>
+            </View>
+            <TouchableOpacity>
+              <Text style={styles.seeAll}>See all</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* My Voice Carousel */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carouselContent}
+            decelerationRate="fast"
+            snapToInterval={CAROUSEL_CARD_WIDTH + spacing.md}
+          >
+            {voiceStories.map((story) => (
+              <TouchableOpacity
+                key={story.id}
+                style={styles.carouselCard}
+                onPress={() => navigation.navigate('StoryDetail', { story })}
+                activeOpacity={0.85}
+              >
+                <View style={styles.carouselImageWrapper}>
+                  {story.cover_url ? (
+                    <Image source={{ uri: story.cover_url }} style={styles.cover} />
+                  ) : (
+                    <View style={[styles.cover, styles.placeholderCover]}>
+                      <Text style={styles.placeholderText}>📚</Text>
+                    </View>
+                  )}
+                  <View style={styles.imageOverlay} />
+                  <View style={styles.voiceBadge}>
+                    <Text style={styles.voiceBadgeText}>🎤 MY VOICE</Text>
+                  </View>
+                </View>
+                <View style={styles.cardInfo}>
+                  <Text style={styles.title} numberOfLines={2}>{story.title}</Text>
+                  <Text style={styles.author} numberOfLines={1}>{story.author}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </>
+      )}
+
+      {/* Explore Stories Header */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Explore Stories</Text>
         <TouchableOpacity>
           <Text style={styles.seeAll}>See all</Text>
         </TouchableOpacity>
       </View>
+    </>
+  );
 
+  return (
+    <View style={styles.container}>
       {/* Stories Grid */}
       {loading ? (
         <View style={styles.centered}>
@@ -162,19 +216,18 @@ export function HomeScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredStories}
+          data={stories}
           renderItem={renderStory}
           keyExtractor={(item) => item.id}
           numColumns={2}
           contentContainerStyle={styles.grid}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={renderHeader}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>📖</Text>
               <Text style={styles.emptyTitle}>No stories found</Text>
-              <Text style={styles.emptySubtitle}>
-                {searchQuery ? 'Try a different search' : 'Check back for new content'}
-              </Text>
+              <Text style={styles.emptySubtitle}>Check back for new content</Text>
             </View>
           }
         />
@@ -188,36 +241,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  searchSection: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundInput,
-    borderRadius: borderRadius.xl,
-    paddingHorizontal: spacing.lg,
-    height: 52,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  searchIcon: {
-    fontSize: 18,
-    marginRight: spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: typography.sizes.md,
-  },
-  clearIcon: {
-    color: colors.textMuted,
-    fontSize: 16,
-    padding: spacing.xs,
-  },
   categoriesWrapper: {
+    marginTop: spacing.sm,
     marginBottom: spacing.md,
   },
   categories: {
@@ -254,6 +279,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  voiceIcon: {
+    fontSize: 18,
+  },
   sectionTitle: {
     fontSize: typography.sizes.lg,
     fontWeight: typography.weights.bold,
@@ -263,6 +296,24 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.accent,
     fontWeight: typography.weights.medium,
+  },
+  carouselContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  carouselCard: {
+    width: CAROUSEL_CARD_WIDTH,
+    marginRight: spacing.md,
+    backgroundColor: colors.backgroundCard,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.accentPink + '30',
+    ...shadows.md,
+  },
+  carouselImageWrapper: {
+    position: 'relative',
+    aspectRatio: 3/4,
   },
   grid: {
     paddingHorizontal: spacing.lg,
@@ -301,6 +352,21 @@ const styles = StyleSheet.create({
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
+  },
+  voiceBadge: {
+    position: 'absolute',
+    top: spacing.sm,
+    left: spacing.sm,
+    backgroundColor: colors.accentPink,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.pill,
+  },
+  voiceBadgeText: {
+    fontSize: 10,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+    letterSpacing: 0.3,
   },
   favoriteBtn: {
     position: 'absolute',

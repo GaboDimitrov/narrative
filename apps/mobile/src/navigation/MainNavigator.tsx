@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { HomeScreen } from '../screens/HomeScreen';
+import { SearchScreen } from '../screens/SearchScreen';
 import { StoryDetailScreen } from '../screens/StoryDetailScreen';
 import { LibraryScreen } from '../screens/LibraryScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
@@ -15,8 +16,9 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const icons: Record<string, string> = {
     Home: '⌂',
+    Search: '⌕',
     Library: '♫',
-    Settings: '≡',
+    Profile: '●',
   };
   
   return (
@@ -100,6 +102,14 @@ function HomeTabs() {
         }}
       />
       <Tab.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{
+          tabBarLabel: 'Search',
+          headerTitle: 'Search',
+        }}
+      />
+      <Tab.Screen
         name="Library"
         component={LibraryScreen}
         options={{
@@ -108,11 +118,11 @@ function HomeTabs() {
         }}
       />
       <Tab.Screen
-        name="Settings"
+        name="Profile"
         component={SettingsScreen}
         options={{
-          tabBarLabel: 'Settings',
-          headerTitle: 'Settings',
+          tabBarLabel: 'Profile',
+          headerTitle: 'Profile',
         }}
       />
     </Tab.Navigator>

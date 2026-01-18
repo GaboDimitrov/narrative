@@ -19,8 +19,9 @@ export type AuthStackParamList = {
 
 export type MainTabParamList = {
   Home: undefined;
+  Search: undefined;
   Library: undefined;
-  Settings: undefined;
+  Profile: undefined;
 };
 
 declare global {

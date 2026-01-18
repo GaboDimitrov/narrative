@@ -3,16 +3,31 @@ import { StoryCard } from '@/components/StoryCard';
 
 export const dynamic = 'force-dynamic';
 
+interface Story {
+  id: string;
+  title: string;
+  author: string;
+  description: string | null;
+  cover_url: string | null;
+  chapters: { count: number }[];
+}
+
 export default async function LibraryPage() {
   const supabase = await createSupabaseServerClient();
   
-  const { data: stories, error } = await supabase
+  const { data, error } = await supabase
     .from('stories')
     .select(`
-      *,
+      id,
+      title,
+      author,
+      description,
+      cover_url,
       chapters:chapters(count)
     `)
     .order('created_at', { ascending: false });
+
+  const stories = data as Story[] | null;
 
   if (error) {
     console.error('Error fetching stories:', error);
@@ -49,7 +64,7 @@ export default async function LibraryPage() {
               author={story.author}
               description={story.description}
               coverUrl={story.cover_url}
-              chapterCount={(story.chapters as any)?.[0]?.count || 0}
+              chapterCount={story.chapters?.[0]?.count || 0}
             />
           ))}
         </div>

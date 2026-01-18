@@ -8,6 +8,9 @@ export interface Database {
           author: string;
           description: string | null;
           cover_url: string | null;
+          voice_id: string | null;
+          voice_name: string | null;
+          creator_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -16,6 +19,9 @@ export interface Database {
           author: string;
           description?: string | null;
           cover_url?: string | null;
+          voice_id?: string | null;
+          voice_name?: string | null;
+          creator_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -24,6 +30,9 @@ export interface Database {
           author?: string;
           description?: string | null;
           cover_url?: string | null;
+          voice_id?: string | null;
+          voice_name?: string | null;
+          creator_id?: string | null;
           created_at?: string;
         };
       };

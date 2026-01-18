@@ -309,6 +309,7 @@ export async function POST(request: NextRequest) {
     const narratorVoiceInput = formData.get('narratorVoice') as string | null;
     const voiceStability = parseFloat(formData.get('voiceStability') as string) || 0.6;
     const voiceStyle = parseFloat(formData.get('voiceStyle') as string) || 0.15;
+    const voiceSpeed = parseFloat(formData.get('voiceSpeed') as string) || 1.0;
     const voiceClarity = formData.get('voiceClarity') === 'true';
 
     if (!file) {
@@ -344,14 +345,15 @@ export async function POST(request: NextRequest) {
     VOICE_POOL.neutral = narratorVoiceId;
 
     // Store custom voice settings for this request
-    const customVoiceSettings = {
+    const customVoiceSettings: VoiceSettings = {
       stability: voiceStability,
       similarity_boost: 0.8,
       style: voiceStyle,
       use_speaker_boost: voiceClarity,
+      speed: voiceSpeed,
     };
     
-    console.log(`[${storyId}] Voice settings: stability=${voiceStability}, style=${voiceStyle}, clarity=${voiceClarity}`);
+    console.log(`[${storyId}] Voice settings: stability=${voiceStability}, style=${voiceStyle}, speed=${voiceSpeed}x, clarity=${voiceClarity}`);
 
     // Parse PDF using unpdf
     console.log(`[${storyId}] Parsing PDF...`);
@@ -394,12 +396,36 @@ export async function POST(request: NextRequest) {
 
     // Create story record
     const supabase = getSupabaseAdmin();
+    
+    // Determine voice name for display
+    let voiceName: string | null = null;
+    if (narratorVoiceInput && narratorVoiceInput.trim()) {
+      // If it was a voice ID, try to get the name from ElevenLabs
+      if (looksLikeVoiceId(narratorVoiceInput.trim())) {
+        try {
+          const voiceResponse = await fetch(`https://api.elevenlabs.io/v1/voices/${narratorVoiceId}`, {
+            headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY! },
+          });
+          if (voiceResponse.ok) {
+            const voiceData = await voiceResponse.json();
+            voiceName = voiceData.name || narratorVoiceInput.trim();
+          }
+        } catch {
+          voiceName = narratorVoiceInput.trim();
+        }
+      } else {
+        voiceName = narratorVoiceInput.trim();
+      }
+    }
+    
     await supabase.from('stories').insert({
       id: storyId,
       title,
       author,
       description: 'AI-generated audiobook with character voices',
       cover_url: coverUrl || null,
+      voice_id: narratorVoiceId !== DEFAULT_NARRATOR_VOICE_ID ? narratorVoiceId : null,
+      voice_name: voiceName,
     });
 
     // Process chapters
@@ -607,6 +633,7 @@ interface VoiceSettings {
   similarity_boost: number;
   style: number;
   use_speaker_boost: boolean;
+  speed?: number;
 }
 
 // Default voice settings optimized for audiobook narration
@@ -648,6 +675,10 @@ async function generateAudio(
     voiceSettings = DEFAULT_DIALOGUE_VOICE_SETTINGS;
   }
 
+  // Extract speed from voice settings (it goes at the top level, not in voice_settings)
+  const speed = voiceSettings.speed || 1.0;
+  const { speed: _, ...voiceSettingsWithoutSpeed } = voiceSettings;
+
   const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
     method: 'POST',
     headers: {
@@ -658,7 +689,8 @@ async function generateAudio(
     body: JSON.stringify({
       text,
       model_id: 'eleven_multilingual_v2',
-      voice_settings: voiceSettings,
+      voice_settings: voiceSettingsWithoutSpeed,
+      ...(speed !== 1.0 && { speed }), // Only include speed if not default
     }),
   });
 
