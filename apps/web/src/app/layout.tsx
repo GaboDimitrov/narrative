@@ -5,7 +5,7 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Narrator - Cinematic AI Audiobooks',
+  title: 'Narrative - Immersive Audiobooks',
   description: 'Experience audiobooks like never before with AI-generated character voices and immersive soundscapes.',
 };
 

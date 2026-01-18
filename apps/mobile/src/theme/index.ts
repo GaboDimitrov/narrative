@@ -1,4 +1,4 @@
-// Narrator Theme - Purple/Violet Gradient Aesthetic
+// Narrative Theme - Purple/Violet Gradient Aesthetic
 // Vibrant, modern dark theme with neon accents
 
 export const colors = {
@@ -42,10 +42,17 @@ export const colors = {
   starEmpty: '#404055',
   
   // Tab bar
-  tabBarBackground: '#1a1a2e',
+  tabBarBackground: 'rgba(20, 15, 35, 0.92)',
   tabBarActiveBackground: '#ffffff',
   tabBarActive: '#0f0f1a',
-  tabBarInactive: '#6b6b8a',
+  tabBarInactive: '#7a7a99',
+  
+  // Neon effects
+  neonPurple: '#a855f7',
+  neonPink: '#f472b6',
+  neonBlue: '#818cf8',
+  neonGlow: 'rgba(168, 85, 247, 0.6)',
+  neonBorder: 'rgba(139, 92, 246, 0.35)',
 };
 
 export const spacing = {

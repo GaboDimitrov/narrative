@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -16,7 +16,7 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const icons: Record<string, string> = {
     Home: '⌂',
     Library: '♫',
-    Settings: '⚙',
+    Settings: '≡',
   };
   
   return (
@@ -34,21 +34,62 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   );
 }
 
+function CustomTabBar({ state, descriptors, navigation }: any) {
+  return (
+    <View style={styles.tabBarContainer}>
+      {/* Neon glow layer */}
+      <View style={styles.neonGlow} />
+      
+      {/* Main tab bar */}
+      <View style={styles.tabBar}>
+        {state.routes.map((route: any, index: number) => {
+          const { options } = descriptors[route.key];
+          const label = options.tabBarLabel ?? route.name;
+          const focused = state.index === index;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!focused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          return (
+            <TouchableOpacity
+              key={route.key}
+              style={styles.tabItem}
+              onPress={onPress}
+              activeOpacity={0.7}
+            >
+              <TabIcon name={route.name} focused={focused} />
+              <Text style={[
+                styles.tabBarLabel,
+                { color: focused ? colors.textPrimary : colors.tabBarInactive }
+              ]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function HomeTabs() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarActiveTintColor: colors.tabBarActive,
-        tabBarInactiveTintColor: colors.tabBarInactive,
-        tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
-        tabBarStyle: styles.tabBar,
-        tabBarItemStyle: styles.tabBarItem,
-        tabBarLabelStyle: styles.tabBarLabel,
-        tabBarShowLabel: true,
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{
         headerStyle: styles.header,
         headerTitleStyle: styles.headerTitle,
         headerTintColor: colors.textPrimary,
-      })}
+      }}
     >
       <Tab.Screen
         name="Home"
@@ -117,35 +158,49 @@ export function MainNavigator() {
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
+  tabBarContainer: {
     position: 'absolute',
     bottom: spacing.xxl,
-    left: spacing.xxl,
-    right: spacing.xxl,
-    backgroundColor: colors.tabBarBackground,
-    borderRadius: borderRadius.pill,
-    height: 70,
-    paddingBottom: 0,
-    paddingTop: 0,
-    borderTopWidth: 0,
-    shadowColor: '#8b5cf6',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+    left: spacing.xl,
+    right: spacing.xl,
   },
-  tabBarItem: {
-    paddingVertical: spacing.sm,
+  neonGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: borderRadius.pill,
+    shadowColor: '#a855f7',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 15,
+    backgroundColor: 'rgba(168, 85, 247, 0.08)',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(22, 18, 38, 0.95)',
+    borderRadius: borderRadius.pill,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
   tabBarLabel: {
     fontSize: typography.sizes.xs,
     fontWeight: typography.weights.medium,
-    marginTop: 2,
   },
   tabIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -153,7 +208,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tabBarActiveBackground,
   },
   tabIcon: {
-    fontSize: 20,
+    fontSize: 18,
   },
   header: {
     backgroundColor: colors.background,

@@ -14,7 +14,7 @@ export default function AuthLayout({
             <span className="text-white text-xl">📖</span>
           </div>
           <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-primary-300">
-            Narrator
+            Narrative
           </span>
         </Link>
       </header>

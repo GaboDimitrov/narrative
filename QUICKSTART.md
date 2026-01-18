@@ -1,4 +1,4 @@
-# Taleify - Quick Start (2 minutes)
+# Narrative - Quick Start (2 minutes)
 
 ## Prerequisites
 - Install Bun: `curl -fsSL https://bun.sh/install | bash`

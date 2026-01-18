@@ -6,10 +6,9 @@ import { join } from 'path';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 
-// Set ffmpeg path
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+// Use system ffmpeg (installed via: brew install ffmpeg)
+ffmpeg.setFfmpegPath('/opt/homebrew/bin/ffmpeg');
 
 export const maxDuration = 300;
 
@@ -25,10 +24,13 @@ function getSupabaseAdmin() {
   );
 }
 
+// Default narrator voice ID - Daniel - British male, deep authoritative news presenter style
+const DEFAULT_NARRATOR_VOICE_ID = 'onwK4e9ZLuTAKqWW03F9';
+
 // ElevenLabs voice IDs - selected for maximum distinctiveness
 const VOICE_POOL: Record<string, string> = {
   // Narrator: Daniel - British male, deep authoritative news presenter style
-  narrator: 'onwK4e9ZLuTAKqWW03F9',
+  narrator: DEFAULT_NARRATOR_VOICE_ID,
   // Young female: Alice - British female, youthful and clear
   young_female: 'Xb7hH8MSUJpSbSDYk0k2',
   // Mature female: Sarah - American female, warm and expressive
@@ -44,8 +46,117 @@ const VOICE_POOL: Record<string, string> = {
   // Child: Matilda - American female, lighter youthful voice
   child: 'XrExE9yKIg1WjnnlVkGX',
   // Neutral fallback: Daniel (same as narrator)
-  neutral: 'onwK4e9ZLuTAKqWW03F9',
+  neutral: DEFAULT_NARRATOR_VOICE_ID,
 };
+
+interface ElevenLabsVoice {
+  voice_id: string;
+  name: string;
+}
+
+/**
+ * Checks if a string looks like an ElevenLabs voice ID (alphanumeric, ~20 chars).
+ */
+function looksLikeVoiceId(input: string): boolean {
+  // ElevenLabs voice IDs are typically 20 alphanumeric characters
+  return /^[a-zA-Z0-9]{15,25}$/.test(input.trim());
+}
+
+/**
+ * Validates a voice ID by checking if it exists in ElevenLabs.
+ */
+async function validateVoiceId(voiceId: string): Promise<boolean> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return false;
+
+  try {
+    const response = await fetch(`https://api.elevenlabs.io/v1/voices/${voiceId}`, {
+      method: 'GET',
+      headers: {
+        'xi-api-key': apiKey,
+      },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetches available voices from ElevenLabs and finds a voice by name.
+ * Returns the voice ID if found, or null if not found.
+ */
+async function findElevenLabsVoiceByName(voiceName: string): Promise<{ voiceId: string | null; availableVoices: string[] }> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
+    return { voiceId: null, availableVoices: [] };
+  }
+
+  try {
+    const response = await fetch('https://api.elevenlabs.io/v1/voices', {
+      method: 'GET',
+      headers: {
+        'xi-api-key': apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      console.error('Failed to fetch ElevenLabs voices:', response.status);
+      return { voiceId: null, availableVoices: [] };
+    }
+
+    const data = await response.json();
+    const voices: ElevenLabsVoice[] = data.voices || [];
+    
+    // Find voice by name (case-insensitive)
+    const normalizedName = voiceName.toLowerCase().trim();
+    const matchedVoice = voices.find(
+      (v) => v.name.toLowerCase() === normalizedName
+    );
+
+    return {
+      voiceId: matchedVoice?.voice_id || null,
+      availableVoices: voices.map((v) => v.name),
+    };
+  } catch (error) {
+    console.error('Error fetching ElevenLabs voices:', error);
+    return { voiceId: null, availableVoices: [] };
+  }
+}
+
+/**
+ * Resolves a voice input (name or ID) to a valid voice ID.
+ */
+async function resolveVoiceInput(input: string): Promise<{ voiceId: string | null; warning?: string }> {
+  const trimmedInput = input.trim();
+  
+  // Check if it looks like a voice ID
+  if (looksLikeVoiceId(trimmedInput)) {
+    console.log(`Input "${trimmedInput}" looks like a voice ID, validating...`);
+    const isValid = await validateVoiceId(trimmedInput);
+    if (isValid) {
+      return { voiceId: trimmedInput };
+    } else {
+      return { 
+        voiceId: null, 
+        warning: `Voice ID "${trimmedInput}" is not valid or not accessible with your API key.` 
+      };
+    }
+  }
+  
+  // Otherwise, search by name
+  console.log(`Searching for voice by name: "${trimmedInput}"`);
+  const { voiceId, availableVoices } = await findElevenLabsVoiceByName(trimmedInput);
+  
+  if (voiceId) {
+    return { voiceId };
+  }
+  
+  return {
+    voiceId: null,
+    warning: `Voice "${trimmedInput}" was not found in ElevenLabs. Using default narrator voice instead. Available voices include: ${availableVoices.slice(0, 10).join(', ')}${availableVoices.length > 10 ? '...' : ''}`,
+  };
+}
 
 interface Chapter {
   number: number;
@@ -195,6 +306,10 @@ export async function POST(request: NextRequest) {
     const title = formData.get('title') as string | null;
     const author = formData.get('author') as string | null;
     const coverUrl = formData.get('coverUrl') as string | null;
+    const narratorVoiceInput = formData.get('narratorVoice') as string | null;
+    const voiceStability = parseFloat(formData.get('voiceStability') as string) || 0.6;
+    const voiceStyle = parseFloat(formData.get('voiceStyle') as string) || 0.15;
+    const voiceClarity = formData.get('voiceClarity') === 'true';
 
     if (!file) {
       return NextResponse.json({ error: 'PDF file is required' }, { status: 400 });
@@ -206,6 +321,37 @@ export async function POST(request: NextRequest) {
 
     const storyId = randomUUID();
     console.log(`[${storyId}] Starting audiobook generation for: ${title}`);
+
+    // Resolve narrator voice
+    let narratorVoiceId = DEFAULT_NARRATOR_VOICE_ID;
+    let voiceWarning: string | undefined;
+
+    if (narratorVoiceInput && narratorVoiceInput.trim()) {
+      console.log(`[${storyId}] Resolving custom narrator voice: ${narratorVoiceInput}`);
+      const result = await resolveVoiceInput(narratorVoiceInput);
+      
+      if (result.voiceId) {
+        narratorVoiceId = result.voiceId;
+        console.log(`[${storyId}] Using custom narrator voice ID: ${narratorVoiceId}`);
+      } else {
+        console.log(`[${storyId}] Voice resolution failed, using default narrator`);
+        voiceWarning = result.warning;
+      }
+    }
+
+    // Update VOICE_POOL with the custom narrator voice
+    VOICE_POOL.narrator = narratorVoiceId;
+    VOICE_POOL.neutral = narratorVoiceId;
+
+    // Store custom voice settings for this request
+    const customVoiceSettings = {
+      stability: voiceStability,
+      similarity_boost: 0.8,
+      style: voiceStyle,
+      use_speaker_boost: voiceClarity,
+    };
+    
+    console.log(`[${storyId}] Voice settings: stability=${voiceStability}, style=${voiceStyle}, clarity=${voiceClarity}`);
 
     // Parse PDF using unpdf
     console.log(`[${storyId}] Parsing PDF...`);
@@ -271,7 +417,7 @@ export async function POST(request: NextRequest) {
         const isNarrator = segment.speaker.toLowerCase() === 'narrator';
         console.log(`[${storyId}] Generating audio for segment ${i + 1}/${segments.length} (${segment.speaker})`);
         
-        const audioBuffer = await generateAudio(segment.text, segment.voiceId, isNarrator);
+        const audioBuffer = await generateAudio(segment.text, segment.voiceId, isNarrator, customVoiceSettings);
         audioBuffers.push(audioBuffer);
         
         if (i < segments.length - 1) {
@@ -326,6 +472,7 @@ export async function POST(request: NextRequest) {
       author,
       totalChapters: generatedChapters.length,
       chapters: generatedChapters,
+      ...(voiceWarning && { voiceWarning }),
     });
   } catch (error) {
     console.error('Error generating audiobook:', error);
@@ -455,22 +602,34 @@ ${chapter.text.substring(0, 15000)}`,
   }
 }
 
-// Voice settings optimized for audiobook narration
-const NARRATOR_VOICE_SETTINGS = {
+interface VoiceSettings {
+  stability: number;
+  similarity_boost: number;
+  style: number;
+  use_speaker_boost: boolean;
+}
+
+// Default voice settings optimized for audiobook narration
+const DEFAULT_NARRATOR_VOICE_SETTINGS: VoiceSettings = {
   stability: 0.6,           // Slightly higher for consistent narration
   similarity_boost: 0.8,    // Better voice identity preservation
   style: 0.15,              // Subtle expressiveness for narration
   use_speaker_boost: true,  // Enhanced clarity
 };
 
-const DIALOGUE_VOICE_SETTINGS = {
+const DEFAULT_DIALOGUE_VOICE_SETTINGS: VoiceSettings = {
   stability: 0.5,           // Allow more variation for character expression
   similarity_boost: 0.8,    // Keep voice identity
   style: 0.4,               // More emotional expression for dialogue
   use_speaker_boost: true,  // Enhanced clarity
 };
 
-async function generateAudio(text: string, voiceId: string, isNarrator: boolean = false): Promise<Buffer> {
+async function generateAudio(
+  text: string, 
+  voiceId: string, 
+  isNarrator: boolean = false,
+  customSettings?: VoiceSettings
+): Promise<Buffer> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new Error('ELEVENLABS_API_KEY not configured');
 
@@ -479,8 +638,15 @@ async function generateAudio(text: string, voiceId: string, isNarrator: boolean 
     text = text.substring(0, MAX_CHARS);
   }
 
-  // Use different voice settings for narrator vs dialogue
-  const voiceSettings = isNarrator ? NARRATOR_VOICE_SETTINGS : DIALOGUE_VOICE_SETTINGS;
+  // Use custom settings if provided for narrator, otherwise use defaults
+  let voiceSettings: VoiceSettings;
+  if (isNarrator && customSettings) {
+    voiceSettings = customSettings;
+  } else if (isNarrator) {
+    voiceSettings = DEFAULT_NARRATOR_VOICE_SETTINGS;
+  } else {
+    voiceSettings = DEFAULT_DIALOGUE_VOICE_SETTINGS;
+  }
 
   const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
     method: 'POST',

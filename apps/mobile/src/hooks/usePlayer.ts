@@ -4,10 +4,16 @@ import TrackPlayer, {
   usePlaybackState, 
   useProgress,
   Track,
+  Event,
 } from 'react-native-track-player';
 import * as FileSystem from 'expo-file-system';
+import { Asset } from 'expo-asset';
 import { supabase } from '../lib/supabase';
 import { setupPlayer } from '../services/trackPlayerService';
+
+// Intro sound that plays before every story (Black Mirror style)
+const INTRO_SOUND = require('../../assets/intro-sound.mp3');
+const INTRO_TRACK_ID = '__intro__';
 
 export function usePlayer() {
   const [isSetup, setIsSetup] = useState(false);
@@ -111,32 +117,66 @@ export function usePlayer() {
         }
       }
 
-      // Reset player and add track
+      // Reset player
       await TrackPlayer.reset();
       
-      const track: Track = {
+      // Load intro sound asset
+      const introAsset = Asset.fromModule(INTRO_SOUND);
+      await introAsset.downloadAsync();
+      console.log('Intro sound loaded:', introAsset.localUri);
+
+      // Add intro track first (Black Mirror style opening)
+      const introTrack: Track = {
+        id: INTRO_TRACK_ID,
+        url: introAsset.localUri || introAsset.uri,
+        title: 'Taleify',
+        artist: 'Opening',
+      };
+      await TrackPlayer.add(introTrack);
+      console.log('Intro track added');
+
+      // Add the actual chapter track
+      const chapterTrack: Track = {
         id: chapterId,
         url: localUri,
         title: title,
         artist: storyTitle,
         artwork: coverUrl,
       };
+      await TrackPlayer.add(chapterTrack);
+      console.log('Chapter track added:', chapterTrack.title);
 
-      await TrackPlayer.add(track);
-      console.log('Track added:', track.title);
+      // Listen for track change to handle seeking and progress tracking
+      const pendingStartPosition = startPosition;
+      const pendingChapterId = chapterId;
+      
+      const trackChangeListener = TrackPlayer.addEventListener(
+        Event.PlaybackActiveTrackChanged,
+        async (event) => {
+          // When we switch to the chapter track (from intro)
+          if (event.track?.id === pendingChapterId) {
+            console.log('Switched to chapter track');
+            
+            // Seek to saved position if provided
+            if (pendingStartPosition && pendingStartPosition > 0) {
+              console.log('Seeking to saved position:', pendingStartPosition / 1000, 'seconds');
+              await TrackPlayer.seekTo(pendingStartPosition / 1000);
+            }
+            
+            // Start progress tracking for the chapter
+            startProgressTracking(pendingChapterId);
+            
+            // Remove this listener after handling
+            trackChangeListener.remove();
+          }
+        }
+      );
 
-      // Seek to start position if provided
-      if (startPosition && startPosition > 0) {
-        console.log('Seeking to saved position:', startPosition / 1000, 'seconds');
-        await TrackPlayer.seekTo(startPosition / 1000);
-      }
-
-      // Start playback
-      console.log('Starting playback...');
+      // Start playback (will start with intro)
+      console.log('Starting playback with intro...');
       await TrackPlayer.play();
       console.log('Playback started');
       
-      startProgressTracking(chapterId);
     } catch (error) {
       console.error('Error playing chapter:', error);
     }

@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@taleify/supabase'],
   images: {
-    domains: ['images.unsplash.com'],
+    domains: ['images.unsplash.com', 'www.book.store.bg'],
   },
 };
 

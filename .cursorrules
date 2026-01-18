@@ -1,4 +1,4 @@
-# Taleify Development Rules
+# Narrative Development Rules
 
 ## Tech Stack
 - Bun for package management
@@ -21,6 +21,6 @@
 - Don't duplicate logic between apps
 
 ## Supabase
-- Always use typed client from @taleify/supabase
+- Always use typed client from @Narrative/supabase
 - Enable RLS on all tables
 - Use upsert for progress tracking

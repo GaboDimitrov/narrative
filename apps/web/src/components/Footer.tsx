@@ -5,9 +5,16 @@ export default function Footer() {
         <div className="grid md:grid-cols-4 gap-12 mb-12">
           {/* Brand */}
           <div className="md:col-span-1">
-            <h3 className="text-2xl font-bold text-white mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-primary-300">
-              Narrator
-            </h3>
+            <div className="flex items-center gap-3 mb-4">
+              <img 
+                src="/logo.png" 
+                alt="Narrative Logo" 
+                className="w-10 h-10 object-contain"
+              />
+              <h3 className="text-2xl font-bold text-white bg-clip-text text-transparent bg-gradient-to-r from-white to-primary-300">
+                Narrative
+              </h3>
+            </div>
             <p className="text-gray-500 leading-relaxed">
               Bringing stories to life with AI-powered cinematic audiobook experiences.
             </p>
@@ -64,7 +71,7 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="mailto:hello@narrator.ai" className="text-gray-400 hover:text-primary-400 transition-colors">
+                <a href="mailto:hello@narrative.ai" className="text-gray-400 hover:text-primary-400 transition-colors">
                   Contact
                 </a>
               </li>
@@ -75,7 +82,7 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="pt-8 border-t border-dark-border flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-gray-600 text-sm">
-            &copy; {new Date().getFullYear()} Narrator. All rights reserved.
+            &copy; {new Date().getFullYear()} Narrative. All rights reserved.
           </p>
           <div className="flex gap-6 text-sm">
             <a href="#" className="text-gray-500 hover:text-gray-300 transition-colors">

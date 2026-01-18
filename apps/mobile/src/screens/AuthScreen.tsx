@@ -35,9 +35,13 @@ export function AuthScreen() {
         {/* Hero/Branding */}
         <View style={styles.branding}>
           <View style={styles.logoContainer}>
-            <Text style={styles.logoEmoji}>📚</Text>
+            <Image 
+              source={require('../../assets/logo.png')} 
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
-          <Text style={styles.title}>Narrator</Text>
+          <Text style={styles.title}>Narrative</Text>
           <Text style={styles.subtitle}>
             Transform your ideas{'\n'}into captivating audio stories
           </Text>
@@ -129,8 +133,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     ...shadows.glow,
   },
-  logoEmoji: {
-    fontSize: 48,
+  logoImage: {
+    width: 70,
+    height: 70,
   },
   title: {
     fontSize: typography.sizes.display,

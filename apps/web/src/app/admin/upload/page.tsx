@@ -18,6 +18,7 @@ interface GenerationResult {
   author: string;
   totalChapters: number;
   chapters: GeneratedChapter[];
+  voiceWarning?: string;
 }
 
 export default function AdminUploadPage() {
@@ -25,11 +26,56 @@ export default function AdminUploadPage() {
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
+  const [narratorVoice, setNarratorVoice] = useState('');
+  const [voiceStability, setVoiceStability] = useState(60); // 0-100, default 60%
+  const [voiceStyle, setVoiceStyle] = useState(15); // 0-100, default 15%
+  const [voiceClarity, setVoiceClarity] = useState(true); // speaker boost
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [progress, setProgress] = useState<string>('');
   const [selectedChapter, setSelectedChapter] = useState<GeneratedChapter | null>(null);
+  const [voiceWarning, setVoiceWarning] = useState<string | null>(null);
+  
+  // Voice checker state
+  const [testVoiceInput, setTestVoiceInput] = useState('');
+  const [isCheckingVoice, setIsCheckingVoice] = useState(false);
+  const [voiceCheckResult, setVoiceCheckResult] = useState<{
+    success: boolean;
+    message: string;
+    voiceId?: string;
+    voiceName?: string;
+  } | null>(null);
+
+  const handleCheckVoice = async () => {
+    if (!testVoiceInput.trim()) return;
+    
+    setIsCheckingVoice(true);
+    setVoiceCheckResult(null);
+    
+    try {
+      const response = await fetch('/api/audiobook/check-voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voice: testVoiceInput.trim() }),
+      });
+      
+      const data = await response.json();
+      setVoiceCheckResult(data);
+      
+      // If voice is found, auto-fill the narrator voice field
+      if (data.success && data.voiceId) {
+        setNarratorVoice(data.voiceId);
+      }
+    } catch {
+      setVoiceCheckResult({
+        success: false,
+        message: 'Failed to check voice. Please try again.',
+      });
+    } finally {
+      setIsCheckingVoice(false);
+    }
+  };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -63,8 +109,15 @@ export default function AdminUploadPage() {
       if (coverUrl) {
         formData.append('coverUrl', coverUrl);
       }
+      if (narratorVoice.trim()) {
+        formData.append('narratorVoice', narratorVoice.trim());
+      }
+      formData.append('voiceStability', String(voiceStability / 100));
+      formData.append('voiceStyle', String(voiceStyle / 100));
+      formData.append('voiceClarity', String(voiceClarity));
 
       setProgress('Processing PDF and generating audiobook... This may take several minutes.');
+      setVoiceWarning(null);
 
       const response = await fetch('/api/audiobook/generate', {
         method: 'POST',
@@ -82,6 +135,12 @@ export default function AdminUploadPage() {
 
       setResult(data);
       setProgress('');
+      
+      // Handle voice warning if the requested voice wasn't found
+      if (data.voiceWarning) {
+        setVoiceWarning(data.voiceWarning);
+      }
+      
       // Auto-select first chapter for playback
       if (data.chapters && data.chapters.length > 0) {
         setSelectedChapter(data.chapters[0]);
@@ -92,6 +151,10 @@ export default function AdminUploadPage() {
       setTitle('');
       setAuthor('');
       setCoverUrl('');
+      setNarratorVoice('');
+      setVoiceStability(60);
+      setVoiceStyle(15);
+      setVoiceClarity(true);
       
       // Reset file input
       const fileInput = document.getElementById('pdf-file') as HTMLInputElement;
@@ -112,6 +175,87 @@ export default function AdminUploadPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">
           Generate Audiobook
         </h1>
+
+        {/* Voice Checker */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-2 border-dashed border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Voice Checker
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Test if a voice name or ID exists in your ElevenLabs account before generating.
+          </p>
+          
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={testVoiceInput}
+              onChange={(e) => setTestVoiceInput(e.target.value)}
+              placeholder="Enter voice name or ID (e.g., Rachel or ONzlyqflv3NLRqoxmiV8)"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              onKeyDown={(e) => e.key === 'Enter' && handleCheckVoice()}
+            />
+            <button
+              type="button"
+              onClick={handleCheckVoice}
+              disabled={isCheckingVoice || !testVoiceInput.trim()}
+              className="px-4 py-2 bg-gray-800 text-white rounded-md font-medium hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            >
+              {isCheckingVoice ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Checking...
+                </>
+              ) : (
+                'Check Voice'
+              )}
+            </button>
+          </div>
+
+          {/* Voice Check Result */}
+          {voiceCheckResult && (
+            <div className={`mt-4 p-4 rounded-md ${
+              voiceCheckResult.success 
+                ? 'bg-green-50 border border-green-200' 
+                : 'bg-red-50 border border-red-200'
+            }`}>
+              <div className="flex items-start gap-3">
+                {voiceCheckResult.success ? (
+                  <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+                <div>
+                  <p className={voiceCheckResult.success ? 'text-green-800' : 'text-red-800'}>
+                    {voiceCheckResult.message}
+                  </p>
+                  {voiceCheckResult.success && voiceCheckResult.voiceId && (
+                    <p className="text-sm text-green-600 mt-1">
+                      Voice ID: <code className="bg-green-100 px-1 py-0.5 rounded">{voiceCheckResult.voiceId}</code>
+                      {voiceCheckResult.voiceName && (
+                        <span className="ml-2">Name: <strong>{voiceCheckResult.voiceName}</strong></span>
+                      )}
+                    </p>
+                  )}
+                  {voiceCheckResult.success && (
+                    <p className="text-sm text-green-600 mt-2">
+                      ✓ Voice ID has been auto-filled in the form below.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
         
         <div className="bg-white rounded-lg shadow-md p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -194,6 +338,106 @@ export default function AdminUploadPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100"
               />
             </div>
+
+            {/* Narrator Voice (Optional) */}
+            <div>
+              <label
+                htmlFor="narratorVoice"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Narrator Voice (Optional)
+              </label>
+              <input
+                id="narratorVoice"
+                type="text"
+                value={narratorVoice}
+                onChange={(e) => setNarratorVoice(e.target.value)}
+                disabled={isLoading}
+                placeholder="Voice name or ID (e.g., Rachel or ONzlyqflv3NLRqoxmiV8)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Enter a voice name or paste a voice ID directly. Leave empty for default narrator.
+              </p>
+            </div>
+
+            {/* Voice Settings */}
+            <div className="space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h3 className="text-sm font-medium text-gray-700">Voice Settings</h3>
+              
+              {/* Stability Slider */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label htmlFor="voiceStability" className="text-sm text-gray-600">
+                    Stability
+                  </label>
+                  <span className="text-sm text-gray-500">{voiceStability}%</span>
+                </div>
+                <input
+                  id="voiceStability"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={voiceStability}
+                  onChange={(e) => setVoiceStability(Number(e.target.value))}
+                  disabled={isLoading}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600 disabled:opacity-50"
+                />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>More expressive</span>
+                  <span>More consistent</span>
+                </div>
+              </div>
+
+              {/* Style Slider */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label htmlFor="voiceStyle" className="text-sm text-gray-600">
+                    Style Intensity
+                  </label>
+                  <span className="text-sm text-gray-500">{voiceStyle}%</span>
+                </div>
+                <input
+                  id="voiceStyle"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={voiceStyle}
+                  onChange={(e) => setVoiceStyle(Number(e.target.value))}
+                  disabled={isLoading}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600 disabled:opacity-50"
+                />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>Neutral</span>
+                  <span>Dramatic</span>
+                </div>
+              </div>
+
+              {/* Speaker Boost Checkbox */}
+              <div className="flex items-center gap-3">
+                <input
+                  id="voiceClarity"
+                  type="checkbox"
+                  checked={voiceClarity}
+                  onChange={(e) => setVoiceClarity(e.target.checked)}
+                  disabled={isLoading}
+                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 disabled:opacity-50"
+                />
+                <label htmlFor="voiceClarity" className="text-sm text-gray-600">
+                  Enhanced clarity (Speaker Boost)
+                </label>
+              </div>
+            </div>
+
+            {/* Voice Warning */}
+            {voiceWarning && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-md flex items-start gap-3">
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>{voiceWarning}</span>
+              </div>
+            )}
 
             {/* Error Message */}
             {error && (

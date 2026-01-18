@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "Narrator",
-    "slug": "narrator",
+    "name": "Narrative",
+    "slug": "narrative",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#0f0f1a"
     },
@@ -18,13 +18,13 @@
       [
         "expo-av",
         {
-          "microphonePermission": "Allow Narrator to access your microphone."
+          "microphonePermission": "Allow Narrative to access your microphone."
         }
       ]
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.narrator.app",
+      "bundleIdentifier": "com.narrative.app",
       "infoPlist": {
         "UIBackgroundModes": [
           "audio"
@@ -36,7 +36,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f0f1a"
       },
-      "package": "com.narrator.app"
+      "package": "com.narrative.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"

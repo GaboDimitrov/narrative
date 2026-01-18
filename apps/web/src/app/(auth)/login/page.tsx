@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createSupabaseClient } from '@taleify/supabase';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,10 +18,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const supabase = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
+      const supabase = createSupabaseBrowserClient();
 
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -30,7 +27,7 @@ export default function LoginPage() {
 
       if (error) throw error;
       
-      router.push('/');
+      router.push('/library');
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
