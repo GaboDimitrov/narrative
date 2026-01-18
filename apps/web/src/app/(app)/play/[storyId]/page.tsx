@@ -42,8 +42,8 @@ export default async function PlayPage({ params }: PlayPageProps) {
   }
 
   // Fetch story with chapters
-  const { data: storyData, error: storyError } = await supabase
-    .from('stories')
+  const { data: storyData, error: storyError } = await (supabase
+    .from('stories') as any)
     .select('*')
     .eq('id', storyId)
     .single();
@@ -54,8 +54,8 @@ export default async function PlayPage({ params }: PlayPageProps) {
 
   const story = storyData as Story;
 
-  const { data: chaptersData, error: chaptersError } = await supabase
-    .from('chapters')
+  const { data: chaptersData, error: chaptersError } = await (supabase
+    .from('chapters') as any)
     .select('*')
     .eq('story_id', storyId)
     .order('order_index', { ascending: true });
@@ -71,8 +71,8 @@ export default async function PlayPage({ params }: PlayPageProps) {
   let progressMap: Record<string, number> = {};
 
   if (chapterIds.length > 0) {
-    const { data: progressData } = await supabase
-      .from('playback_progress')
+    const { data: progressData } = await (supabase
+      .from('playback_progress') as any)
       .select('chapter_id, position_ms')
       .eq('user_id', user.id)
       .in('chapter_id', chapterIds);

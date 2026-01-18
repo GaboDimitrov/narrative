@@ -15,8 +15,8 @@ interface Story {
 export default async function LibraryPage() {
   const supabase = await createSupabaseServerClient();
   
-  const { data, error } = await supabase
-    .from('stories')
+  const { data, error } = await (supabase
+    .from('stories') as any)
     .select(`
       id,
       title,

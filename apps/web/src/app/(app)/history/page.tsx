@@ -30,8 +30,8 @@ export default async function HistoryPage() {
   }
 
   // Get user's playback progress with chapter and story info
-  const { data: progressData, error } = await supabase
-    .from('playback_progress')
+  const { data: progressData, error } = await (supabase
+    .from('playback_progress') as any)
     .select(`
       id,
       position_ms,
