@@ -90,8 +90,8 @@ export function PlayerProvider({ children, userId }: PlayerProviderProps) {
     if (!userId) return;
     try {
       const supabase = createSupabaseBrowserClient();
-      await supabase
-        .from('playback_progress')
+      await (supabase
+        .from('playback_progress') as any)
         .upsert({
           user_id: userId,
           chapter_id: chapterId,
@@ -130,11 +130,13 @@ export function PlayerProvider({ children, userId }: PlayerProviderProps) {
       const supabase = createSupabaseBrowserClient();
 
       // Fetch story
-      const { data: story, error: storyError } = await supabase
-        .from('stories')
+      const { data: storyData, error: storyError } = await (supabase
+        .from('stories') as any)
         .select('*')
         .eq('id', storyId)
         .single();
+      
+      const story: Story | null = storyData;
 
       if (storyError || !story) {
         console.error('Error fetching story:', storyError);
@@ -143,11 +145,13 @@ export function PlayerProvider({ children, userId }: PlayerProviderProps) {
       }
 
       // Fetch chapters
-      const { data: chapters, error: chaptersError } = await supabase
-        .from('chapters')
+      const { data: chaptersData, error: chaptersError } = await (supabase
+        .from('chapters') as any)
         .select('*')
         .eq('story_id', storyId)
         .order('order_index', { ascending: true });
+      
+      const chapters: Chapter[] = chaptersData || [];
 
       if (chaptersError || !chapters || chapters.length === 0) {
         console.error('Error fetching chapters:', chaptersError);
@@ -160,9 +164,9 @@ export function PlayerProvider({ children, userId }: PlayerProviderProps) {
       let startTime = 0;
 
       if (userId) {
-        const chapterIds = chapters.map(c => c.id);
-        const { data: progressData } = await supabase
-          .from('playback_progress')
+        const chapterIds = chapters.map((c: Chapter) => c.id);
+        const { data: progressData } = await (supabase
+          .from('playback_progress') as any)
           .select('chapter_id, position_ms')
           .eq('user_id', userId)
           .in('chapter_id', chapterIds);
@@ -170,7 +174,7 @@ export function PlayerProvider({ children, userId }: PlayerProviderProps) {
         if (progressData && progressData.length > 0) {
           // Find the most recent chapter with progress
           for (let i = chapters.length - 1; i >= 0; i--) {
-            const progress = progressData.find(p => p.chapter_id === chapters[i].id);
+            const progress = progressData.find((p: any) => p.chapter_id === chapters[i].id);
             if (progress) {
               startChapterIndex = i;
               startTime = progress.position_ms / 1000;

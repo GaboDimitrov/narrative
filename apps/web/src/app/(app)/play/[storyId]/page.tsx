@@ -8,6 +8,30 @@ interface PlayPageProps {
   params: Promise<{ storyId: string }>;
 }
 
+interface Story {
+  id: string;
+  title: string;
+  author: string;
+  description: string | null;
+  cover_url: string | null;
+  created_at: string;
+}
+
+interface Chapter {
+  id: string;
+  story_id: string;
+  title: string;
+  order_index: number;
+  audio_url: string;
+  duration_ms: number | null;
+  created_at: string;
+}
+
+interface Progress {
+  chapter_id: string;
+  position_ms: number;
+}
+
 export default async function PlayPage({ params }: PlayPageProps) {
   const { storyId } = await params;
   const supabase = await createSupabaseServerClient();
@@ -18,17 +42,19 @@ export default async function PlayPage({ params }: PlayPageProps) {
   }
 
   // Fetch story with chapters
-  const { data: story, error: storyError } = await supabase
+  const { data: storyData, error: storyError } = await supabase
     .from('stories')
     .select('*')
     .eq('id', storyId)
     .single();
 
-  if (storyError || !story) {
+  if (storyError || !storyData) {
     notFound();
   }
 
-  const { data: chapters, error: chaptersError } = await supabase
+  const story = storyData as Story;
+
+  const { data: chaptersData, error: chaptersError } = await supabase
     .from('chapters')
     .select('*')
     .eq('story_id', storyId)
@@ -38,8 +64,10 @@ export default async function PlayPage({ params }: PlayPageProps) {
     console.error('Error fetching chapters:', chaptersError);
   }
 
+  const chapters: Chapter[] = (chaptersData as Chapter[]) || [];
+
   // Fetch user's progress for this story's chapters
-  const chapterIds = (chapters || []).map(c => c.id);
+  const chapterIds = chapters.map((c: Chapter) => c.id);
   let progressMap: Record<string, number> = {};
 
   if (chapterIds.length > 0) {
@@ -50,7 +78,8 @@ export default async function PlayPage({ params }: PlayPageProps) {
       .in('chapter_id', chapterIds);
 
     if (progressData) {
-      progressMap = progressData.reduce((acc, p) => {
+      const progress = progressData as Progress[];
+      progressMap = progress.reduce((acc: Record<string, number>, p: Progress) => {
         acc[p.chapter_id] = p.position_ms;
         return acc;
       }, {} as Record<string, number>);
@@ -61,7 +90,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
     <StoryPlayer
       key={story.id}
       story={story}
-      chapters={chapters || []}
+      chapters={chapters}
       progressMap={progressMap}
       userId={user.id}
     />

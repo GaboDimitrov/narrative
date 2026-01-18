@@ -88,8 +88,8 @@ export function StoryPlayer({ story, chapters, progressMap, userId }: StoryPlaye
   const saveProgress = useCallback(async (chapterId: string, positionMs: number) => {
     try {
       const supabase = createSupabaseBrowserClient();
-      await supabase
-        .from('playback_progress')
+      await (supabase
+        .from('playback_progress') as any)
         .upsert({
           user_id: userId,
           chapter_id: chapterId,

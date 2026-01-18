@@ -19,8 +19,8 @@ export default function WaitlistForm() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
 
-      const { error } = await supabase
-        .from('waitlist_emails')
+      const { error } = await (supabase
+        .from('waitlist_emails') as any)
         .insert({ email });
 
       if (error) {

@@ -51,8 +51,8 @@ export async function isAdmin(): Promise<boolean> {
 
   console.log('[Admin] Checking admin role for user:', user.id);
 
-  const { data: profile, error: profileError } = await supabase
-    .from('user_profiles')
+  const { data: profile, error: profileError } = await (supabase
+    .from('user_profiles') as any)
     .select('role')
     .eq('id', user.id)
     .single();

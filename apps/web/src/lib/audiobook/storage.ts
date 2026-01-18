@@ -53,7 +53,7 @@ export async function createStoryRecord(
 ): Promise<void> {
   const supabase = createAdminClient();
 
-  const { error } = await supabase.from('stories').insert({
+  const { error } = await (supabase.from('stories') as any).insert({
     id: storyId,
     title,
     author,
@@ -75,7 +75,7 @@ export async function createChapterRecord(
 ): Promise<void> {
   const supabase = createAdminClient();
 
-  const { error } = await supabase.from('chapters').insert({
+  const { error } = await (supabase.from('chapters') as any).insert({
     story_id: storyId,
     title,
     order_index: chapterNumber,

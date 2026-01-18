@@ -27,11 +27,11 @@ export default async function LibraryPage() {
     `)
     .order('created_at', { ascending: false });
 
-  const stories = data as Story[] | null;
-
   if (error) {
     console.error('Error fetching stories:', error);
   }
+
+  const stories: Story[] = (data as Story[]) || [];
 
   return (
     <div>
@@ -42,7 +42,7 @@ export default async function LibraryPage() {
       </div>
 
       {/* Stories Grid */}
-      {!stories || stories.length === 0 ? (
+      {stories.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-dark-card border border-dark-border flex items-center justify-center">
             <svg className="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,7 +56,7 @@ export default async function LibraryPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {stories.map((story) => (
+          {stories.map((story: Story) => (
             <StoryCard
               key={story.id}
               id={story.id}
