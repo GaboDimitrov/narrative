@@ -22,6 +22,21 @@ const NARRATIVE_LETTERS = [
   { letter: 'e', index: 8 },
 ];
 
+// ============================================
+// ANIMATION TIMING CONSTANTS - Easy to adjust
+// ============================================
+const NARRATIVE_ANIMATION = {
+  // How long each letter takes to fly in (seconds)
+  DURATION_BASE: 1.5,
+  DURATION_RANDOM: 0.5, // Adds 0 to this value randomly
+  
+  // Delay before first letter appears (seconds)
+  INITIAL_DELAY: 0.5,
+  
+  // Time between each letter appearing (seconds)
+  DELAY_BETWEEN_LETTERS: 2,
+};
+
 // Shuffle array helper
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
@@ -61,8 +76,8 @@ function NarrativeText() {
             scale: 1,
           }}
           transition={{
-            duration: 15 + Math.random() * 10, // Match ScatteredLetters speed (15-25s)
-            delay: 1 + animationIndex * 2,
+            duration: NARRATIVE_ANIMATION.DURATION_BASE + Math.random() * NARRATIVE_ANIMATION.DURATION_RANDOM,
+            delay: NARRATIVE_ANIMATION.INITIAL_DELAY + animationIndex * NARRATIVE_ANIMATION.DELAY_BETWEEN_LETTERS,
             ease: 'easeOut',
           }}
         >
