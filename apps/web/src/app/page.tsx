@@ -8,7 +8,7 @@ import Footer from '@/components/Footer';
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-dark-bg">
+    <main className="min-h-screen bg-midnight">
       <Header />
       <Hero />
       <HowItWorks />
@@ -16,33 +16,33 @@ export default function HomePage() {
       <Roadmap />
       
       {/* Waitlist Section */}
-      <section id="waitlist" className="py-24 bg-dark-bg relative overflow-hidden">
+      <section id="waitlist" className="py-24 bg-midnight relative overflow-hidden">
         {/* Background gradient orbs */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary-600/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-accent-pink/15 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-sparkle-gold/10 rounded-full blur-[150px]" />
+        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-amber-copper/10 rounded-full blur-[120px]" />
         
-        <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-6 relative z-10">
           <div className="max-w-3xl mx-auto">
             {/* Card container */}
-            <div className="p-12 rounded-3xl bg-gradient-to-br from-dark-card to-dark-elevated border border-dark-border relative overflow-hidden">
+            <div className="p-12 rounded-3xl bg-gradient-to-br from-deep-violet to-night-blue/50 border border-fairy relative overflow-hidden">
               {/* Inner glow */}
-              <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-accent-pink/5" />
+              <div className="absolute inset-0 bg-gradient-to-br from-sparkle-gold/5 to-transparent" />
               
               <div className="relative z-10 text-center">
-                <span className="inline-block px-4 py-2 rounded-full bg-primary-500/10 border border-primary-500/20 text-primary-400 text-sm font-medium mb-6">
+                <span className="badge-magic mb-6 inline-block">
                   Early Access
                 </span>
                 
-                <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                <h2 className="font-display text-4xl md:text-5xl font-bold text-moon-white mb-4">
                   Join the Waitlist
                 </h2>
-                <p className="text-xl text-gray-400 mb-10 max-w-xl mx-auto">
-                  Be the first to experience the future of audiobooks. Get early access and exclusive updates.
+                <p className="text-xl text-secondary mb-10 max-w-xl mx-auto">
+                  Be the first to tell bedtime stories in your own voice. Get early access and exclusive updates.
                 </p>
                 
                 <WaitlistForm />
                 
-                <p className="mt-8 text-sm text-gray-500">
+                <p className="mt-8 text-sm text-muted">
                   No spam, ever. Unsubscribe anytime.
                 </p>
               </div>

@@ -22,13 +22,11 @@ export default function Header() {
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     
-    // Check current user
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
       setLoading(false);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
@@ -39,36 +37,46 @@ export default function Header() {
   return (
     <motion.header
       initial={{ y: -100 }}
-      animate={{ y: 0 }}
+      animate={{ y: scrolled ? 0 : -100 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled 
-          ? 'bg-dark-bg/80 backdrop-blur-xl border-b border-dark-border' 
-          : 'bg-transparent'
+          ? 'bg-overlay backdrop-blur-xl border-b border-fairy pointer-events-auto' 
+          : 'pointer-events-none'
       }`}
     >
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 md:px-6">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 group">
             <img 
               src="/logo.png" 
-              alt="Narrative Logo" 
-              className="w-14 h-14 object-contain"
+              alt="Narrative" 
+              className="w-10 h-10 object-contain"
             />
-            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-primary-300">
+            <span className="text-xl font-display font-bold bg-gradient-to-r from-moon-white to-fairy-gold bg-clip-text text-transparent">
               Narrative
             </span>
           </Link>
 
           {/* Nav Links */}
           <nav className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-gray-400 hover:text-white transition-colors">
+            <a 
+              href="#how-it-works" 
+              className="text-secondary hover:text-fairy-gold transition-colors duration-200"
+            >
+              How It Works
+            </a>
+            <a 
+              href="#features" 
+              className="text-secondary hover:text-fairy-gold transition-colors duration-200"
+            >
               Features
             </a>
-            <a href="#showcase" className="text-gray-400 hover:text-white transition-colors">
-              Experience
-            </a>
-            <a href="#roadmap" className="text-gray-400 hover:text-white transition-colors">
+            <a 
+              href="#roadmap" 
+              className="text-secondary hover:text-fairy-gold transition-colors duration-200"
+            >
               Roadmap
             </a>
           </nav>
@@ -76,11 +84,11 @@ export default function Header() {
           {/* Auth Buttons */}
           <div className="flex items-center gap-4">
             {loading ? (
-              <div className="w-24 h-10 bg-dark-card rounded-full animate-pulse" />
+              <div className="w-28 h-10 bg-deep-violet rounded-full animate-pulse" />
             ) : user ? (
               <Link
                 href="/library"
-                className="px-5 py-2.5 rounded-full bg-gradient-to-r from-primary-600 to-primary-500 text-white font-semibold hover:shadow-glow transition-all duration-300"
+                className="px-6 py-2.5 rounded-full bg-gradient-to-r from-sparkle-gold to-warm-glow text-midnight font-semibold hover:shadow-glow-gold transition-all duration-300"
               >
                 Go to Library
               </Link>
@@ -88,13 +96,13 @@ export default function Header() {
               <>
                 <Link
                   href="/login"
-                  className="text-gray-300 hover:text-white transition-colors font-medium"
+                  className="text-secondary hover:text-fairy-gold transition-colors font-medium"
                 >
                   Sign In
                 </Link>
                 <Link
                   href="/signup"
-                  className="px-5 py-2.5 rounded-full bg-gradient-to-r from-primary-600 to-primary-500 text-white font-semibold hover:shadow-glow transition-all duration-300"
+                  className="px-6 py-2.5 rounded-full bg-gradient-to-r from-sparkle-gold to-warm-glow text-midnight font-semibold hover:shadow-glow-gold transition-all duration-300"
                 >
                   Get Started
                 </Link>

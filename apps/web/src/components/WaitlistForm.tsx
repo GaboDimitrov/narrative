@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { createSupabaseClient } from '@taleify/supabase';
 
 export default function WaitlistForm() {
@@ -43,7 +44,7 @@ export default function WaitlistForm() {
   };
 
   return (
-    <div id="waitlist">
+    <div>
       <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 max-w-lg mx-auto">
         <input
           type="email"
@@ -52,27 +53,41 @@ export default function WaitlistForm() {
           placeholder="Enter your email"
           required
           disabled={status === 'loading'}
-          className="flex-1 px-6 py-4 rounded-full bg-dark-card border border-dark-border text-white placeholder:text-gray-500 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 disabled:opacity-50 transition-all"
+          className="flex-1 px-6 py-4 rounded-full bg-deep-violet border border-fairy text-moon-white placeholder:text-mauve-muted focus:outline-none focus:border-sparkle-gold focus:ring-2 focus:ring-sparkle-gold/20 disabled:opacity-50 transition-all duration-300"
         />
-        <button
+        <motion.button
           type="submit"
           disabled={status === 'loading'}
-          className="px-8 py-4 rounded-full font-semibold bg-gradient-to-r from-primary-600 to-primary-500 text-white hover:shadow-glow-lg transition-all duration-300 disabled:opacity-50 whitespace-nowrap"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="px-8 py-4 rounded-full font-semibold bg-gradient-to-r from-sparkle-gold to-warm-glow text-midnight hover:shadow-glow-gold-lg transition-all duration-300 disabled:opacity-50 whitespace-nowrap"
         >
-          {status === 'loading' ? 'Joining...' : 'Join Waitlist'}
-        </button>
+          {status === 'loading' ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Joining...
+            </span>
+          ) : (
+            'Join Waitlist'
+          )}
+        </motion.button>
       </form>
       
       {message && (
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
           className={`mt-6 p-4 rounded-xl text-center ${
             status === 'success'
-              ? 'bg-green-500/10 border border-green-500/20 text-green-400'
-              : 'bg-red-500/10 border border-red-500/20 text-red-400'
+              ? 'bg-enchanted-blue/10 border border-enchanted-blue/30 text-enchanted-blue'
+              : 'bg-amber-copper/10 border border-amber-copper/30 text-amber-copper'
           }`}
         >
           {message}
-        </div>
+        </motion.div>
       )}
     </div>
   );
